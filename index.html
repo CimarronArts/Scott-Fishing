@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kayak Fishing Intelligence Dashboard - Coastal California</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header with Location Selector -->
+        <header class="dashboard-header">
+            <div class="header-content">
+                <h1>Kayak Fishing Intelligence Dashboard</h1>
+                <div class="location-controls">
+                    <select id="location-selector" class="form-control location-select">
+                        <option value="pillar_point_harbor">Pillar Point Harbor, Half Moon Bay</option>
+                        <option value="pigeon_point">Pigeon Point</option>
+                        <option value="pescadero">Pescadero</option>
+                        <option value="santa_cruz">Santa Cruz</option>
+                    </select>
+                    <div class="location-info">
+                        <span id="current-coordinates">37.5022°N, 122.4817°W</span>
+                        <span id="current-time"></span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Grid -->
+        <main class="dashboard-grid">
+            <!-- Current Conditions Panel -->
+            <section class="conditions-panel">
+                <h2>Current Conditions</h2>
+                <div class="conditions-grid">
+                    <div class="condition-item">
+                        <label>Temperature</label>
+                        <span id="current-temp">--°F</span>
+                    </div>
+                    <div class="condition-item">
+                        <label>Wind</label>
+                        <span id="current-wind">-- knots</span>
+                    </div>
+                    <div class="condition-item">
+                        <label>Barometric Pressure</label>
+                        <span id="current-pressure">-- inHg</span>
+                    </div>
+                    <div class="condition-item">
+                        <label>Tide Status</label>
+                        <span id="current-tide">Loading...</span>
+                    </div>
+                    <div class="condition-item">
+                        <label>Wave Height</label>
+                        <span id="current-waves">-- ft</span>
+                    </div>
+                    <div class="condition-item">
+                        <label>Water Temp</label>
+                        <span id="current-water-temp">--°F</span>
+                    </div>
+                </div>
+                <div class="safety-status">
+                    <div id="safety-indicator" class="safety-indicator good">
+                        <span class="safety-dot"></span>
+                        <span id="safety-text">Conditions Good</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Bite Prediction Score -->
+            <section class="prediction-panel">
+                <h2>Bite Prediction Score</h2>
+                <div class="score-display">
+                    <div class="score-circle">
+                        <span id="bite-score" class="score-number">--</span>
+                        <span class="score-trend" id="score-trend">▶</span>
+                    </div>
+                    <div class="score-label" id="score-label">Calculating...</div>
+                </div>
+                <div class="species-selector">
+                    <label>Target Species:</label>
+                    <div class="species-buttons">
+                        <button class="species-btn active" data-species="rockfish">Rockfish</button>
+                        <button class="species-btn" data-species="lingcod">Lingcod</button>
+                        <button class="species-btn" data-species="salmon">Salmon</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Best Times Panel -->
+            <section class="best-times-panel">
+                <h2>Today's Top Windows</h2>
+                <div id="best-times-list" class="best-times-list">
+                    <!-- Generated dynamically -->
+                </div>
+                <h3>Tomorrow's Top Windows</h3>
+                <div id="tomorrow-times-list" class="best-times-list">
+                    <!-- Generated dynamically -->
+                </div>
+            </section>
+
+            <!-- Solunar Information -->
+            <section class="solunar-panel">
+                <h2>Solunar Forecast</h2>
+                <div class="moon-info">
+                    <div class="moon-phase">
+                        <span id="moon-phase-icon">🌙</span>
+                        <span id="moon-phase-text">Loading...</span>
+                    </div>
+                </div>
+                <div class="solunar-times">
+                    <h4>Major Periods</h4>
+                    <div id="major-periods" class="time-periods">
+                        <!-- Generated dynamically -->
+                    </div>
+                    <h4>Minor Periods</h4>
+                    <div id="minor-periods" class="time-periods">
+                        <!-- Generated dynamically -->
+                    </div>
+                </div>
+                <div class="sun-times">
+                    <div class="sun-time">
+                        <span>Sunrise:</span>
+                        <span id="sunrise-time">--:--</span>
+                    </div>
+                    <div class="sun-time">
+                        <span>Sunset:</span>
+                        <span id="sunset-time">--:--</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 72-Hour Forecast Grid -->
+            <section class="forecast-grid">
+                <h2>72-Hour Forecast</h2>
+                <div class="forecast-container">
+                    <div class="forecast-header">
+                        <span>Time</span>
+                        <span>Score</span>
+                        <span>Weather</span>
+                        <span>Tide</span>
+                        <span>Wind</span>
+                        <span>Waves</span>
+                    </div>
+                    <div id="forecast-rows" class="forecast-rows">
+                        <!-- Generated dynamically -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Interactive Charts -->
+            <section class="charts-section">
+                <h2>Trend Analysis</h2>
+                <div class="charts-grid">
+                    <div class="chart-container" style="position: relative; height: 200px;">
+                        <canvas id="tide-chart"></canvas>
+                    </div>
+                    <div class="chart-container" style="position: relative; height: 200px;">
+                        <canvas id="pressure-chart"></canvas>
+                    </div>
+                    <div class="chart-container" style="position: relative; height: 200px;">
+                        <canvas id="temperature-chart"></canvas>
+                    </div>
+                    <div class="chart-container" style="position: relative; height: 200px;">
+                        <canvas id="wind-chart"></canvas>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Control Actions -->
+        <footer class="dashboard-footer">
+            <div class="footer-controls">
+                <button id="update-data-btn" class="btn btn--primary">
+                    <span>Update Data</span>
+                </button>
+                <span id="last-updated" class="last-updated">Last updated: --:--</span>
+                <button id="export-csv-btn" class="btn btn--secondary">Export CSV</button>
+                <button id="help-btn" class="btn btn--outline">Help</button>
+            </div>
+        </footer>
+
+        <!-- Help Modal -->
+        <div id="help-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Prediction Methodology</h3>
+                    <button id="close-modal" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <h4>Bite Prediction Algorithm</h4>
+                    <p>Our intelligent scoring system combines multiple marine factors:</p>
+                    <ul>
+                        <li><strong>Weather Conditions (30%):</strong> Barometric pressure trends, temperature stability, precipitation</li>
+                        <li><strong>Tide States (25%):</strong> Timing relative to tide changes, current strength, tide height ranges</li>
+                        <li><strong>Solunar Activity (20%):</strong> Major/minor feeding periods, moon phase influence</li>
+                        <li><strong>Water Conditions (15%):</strong> Sea surface temperature, wave height and period</li>
+                        <li><strong>Wind Safety (10%):</strong> Wind speed/direction for kayak safety</li>
+                    </ul>
+                    <h4>Score Interpretation</h4>
+                    <ul>
+                        <li><span class="score-excellent">75-100:</span> Excellent conditions</li>
+                        <li><span class="score-good">50-74:</span> Good fishing potential</li>
+                        <li><span class="score-poor">0-49:</span> Poor conditions</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

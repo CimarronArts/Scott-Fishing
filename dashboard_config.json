@@ -1,0 +1,184 @@
+{
+  "api_sources": {
+    "open_meteo_marine": {
+      "endpoint": "https://api.open-meteo.com/v1/marine",
+      "parameters": {
+        "wave_height": "Wave height of significant mean waves",
+        "wave_direction": "Mean direction of waves",
+        "wave_period": "Period between waves",
+        "wind_wave_height": "Wind wave height",
+        "swell_wave_height": "Swell wave height",
+        "ocean_current_velocity": "Ocean current velocity",
+        "ocean_current_direction": "Ocean current direction",
+        "sea_surface_temperature": "Sea surface temperature",
+        "wind_speed": "Wind speed",
+        "wind_direction": "Wind direction"
+      },
+      "key_required": false,
+      "forecast_days": 8,
+      "free": true
+    },
+    "noaa_tides": {
+      "endpoint": "https://tidesandcurrents.noaa.gov/api/",
+      "station_id": "9414290",
+      "parameters": {
+        "predictions": "Tide predictions",
+        "water_level": "Water level observations",
+        "currents": "Current data",
+        "water_temperature": "Water temperature"
+      },
+      "key_required": false,
+      "free": true
+    },
+    "noaa_weather": {
+      "endpoint": "https://api.weather.gov",
+      "parameters": {
+        "marine_forecasts": "Marine weather forecasts",
+        "small_craft_advisory": "Small craft advisories",
+        "weather_conditions": "General weather conditions",
+        "barometric_pressure": "Barometric pressure"
+      },
+      "key_required": false,
+      "free": true
+    },
+    "noaa_ndbc_buoy": {
+      "buoy_id": "46012",
+      "endpoint": "https://www.ndbc.noaa.gov/data/realtime2/",
+      "parameters": {
+        "water_temperature": "Real-time water temperature",
+        "wave_data": "Wave height, period, direction",
+        "wind_measurements": "Wind speed and direction",
+        "barometric_pressure": "Barometric pressure"
+      },
+      "key_required": false,
+      "free": true
+    },
+    "solunar_org": {
+      "endpoint": "https://api.solunar.org/solunar/lat,lon,date,tz",
+      "parameters": {
+        "major_times": "Major feeding periods",
+        "minor_times": "Minor feeding periods",
+        "moon_phase": "Moon phase data",
+        "sunrise_sunset": "Sunrise/sunset times",
+        "solunar_score": "Overall solunar activity score"
+      },
+      "key_required": false,
+      "free": true
+    }
+  },
+  "locations": {
+    "pillar_point_harbor": {
+      "name": "Pillar Point Harbor, Half Moon Bay",
+      "lat": 37.5022,
+      "lon": -122.4817,
+      "description": "Primary kayak fishing location",
+      "target_species": [
+        "Rockfish",
+        "Lingcod",
+        "Salmon",
+        "Halibut"
+      ]
+    },
+    "pigeon_point": {
+      "name": "Pigeon Point",
+      "lat": 37.18,
+      "lon": -122.39,
+      "description": "Secondary fishing location",
+      "target_species": [
+        "Rockfish",
+        "Lingcod",
+        "Abalone"
+      ]
+    },
+    "pescadero": {
+      "name": "Pescadero",
+      "lat": 37.255,
+      "lon": -122.409,
+      "description": "Beach and nearshore fishing",
+      "target_species": [
+        "Surf Perch",
+        "Striped Bass",
+        "Rockfish"
+      ]
+    },
+    "santa_cruz": {
+      "name": "Santa Cruz",
+      "lat": 36.9741,
+      "lon": -122.0308,
+      "description": "Popular kayak fishing destination",
+      "target_species": [
+        "Salmon",
+        "Rockfish",
+        "Lingcod",
+        "Halibut"
+      ]
+    }
+  },
+  "scoring_weights": {
+    "weather_conditions": {
+      "weight": 0.3,
+      "factors": [
+        "barometric_pressure_trend",
+        "temperature_stability",
+        "cloud_cover",
+        "precipitation"
+      ]
+    },
+    "tide_states": {
+      "weight": 0.25,
+      "factors": [
+        "tide_timing",
+        "tide_height_range",
+        "current_strength"
+      ]
+    },
+    "solunar_activity": {
+      "weight": 0.2,
+      "factors": [
+        "major_minor_periods",
+        "moon_phase_influence",
+        "sunrise_sunset_timing"
+      ]
+    },
+    "water_conditions": {
+      "weight": 0.15,
+      "factors": [
+        "sea_surface_temperature",
+        "wave_height_period"
+      ]
+    },
+    "wind_safety": {
+      "weight": 0.1,
+      "factors": [
+        "wind_speed_direction",
+        "surface_conditions"
+      ]
+    }
+  },
+  "species_adjustments": {
+    "rockfish": {
+      "tide_weight": 0.3,
+      "solunar_weight": 0.15,
+      "water_temp_optimal": [
+        50,
+        60
+      ]
+    },
+    "lingcod": {
+      "tide_weight": 0.35,
+      "solunar_weight": 0.15,
+      "water_temp_optimal": [
+        48,
+        58
+      ]
+    },
+    "salmon": {
+      "solunar_weight": 0.3,
+      "tide_weight": 0.2,
+      "water_temp_optimal": [
+        52,
+        62
+      ]
+    }
+  }
+}
