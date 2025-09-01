@@ -1,4 +1,4 @@
-// Kayak Fishing Intelligence Dashboard - Main Application
+// Enhanced Kayak Fishing Intelligence Dashboard - Main Application
 class FishingDashboard {
     constructor() {
         this.currentLocation = 'pillar_point_harbor';
@@ -6,6 +6,8 @@ class FishingDashboard {
         this.lastUpdate = null;
         this.charts = {};
         this.forecastData = [];
+        this.selectedWindow = null;
+        this.currentDay = 0;
         
         // Location data
         this.locations = {
@@ -35,7 +37,7 @@ class FishingDashboard {
             }
         };
 
-        // Species-specific weights
+        // Enhanced species-specific weights with wind sensitivity
         this.speciesWeights = {
             rockfish: {
                 weather: 0.30,
@@ -43,7 +45,8 @@ class FishingDashboard {
                 solunar: 0.15,
                 water: 0.15,
                 wind: 0.10,
-                optimalWaterTemp: [50, 60]
+                optimalWaterTemp: [50, 60],
+                windSensitivity: 'moderate'
             },
             lingcod: {
                 weather: 0.25,
@@ -51,7 +54,8 @@ class FishingDashboard {
                 solunar: 0.15,
                 water: 0.15,
                 wind: 0.10,
-                optimalWaterTemp: [48, 58]
+                optimalWaterTemp: [48, 58],
+                windSensitivity: 'high'
             },
             salmon: {
                 weather: 0.25,
@@ -59,13 +63,21 @@ class FishingDashboard {
                 solunar: 0.30,
                 water: 0.15,
                 wind: 0.10,
-                optimalWaterTemp: [52, 62]
+                optimalWaterTemp: [52, 62],
+                windSensitivity: 'moderate'
             }
+        };
+
+        // Enhanced wind penalty thresholds
+        this.windThresholds = {
+            safe: 7,
+            poor: 10,
+            penaltyModerate: 0.8,
+            penaltySevere: 0.4
         };
     }
 
     init() {
-        // Wait for DOM to be fully loaded
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 this.initializeApp();
@@ -79,18 +91,17 @@ class FishingDashboard {
         this.setupEventListeners();
         this.updateCurrentTime();
         this.updateLocationInfo();
-        this.generateForecastData();
+        this.generateContinuous72HourForecast();
         this.updateDashboard();
         
-        // Initialize charts after a small delay to ensure DOM is ready
         setTimeout(() => {
-            this.initializeCharts();
+            this.initializeEnhancedCharts();
         }, 100);
         
         // Update every 5 minutes
         setInterval(() => {
             this.updateCurrentTime();
-            this.generateForecastData();
+            this.generateContinuous72HourForecast();
             this.updateDashboard();
         }, 300000);
         
@@ -101,13 +112,13 @@ class FishingDashboard {
     }
 
     setupEventListeners() {
-        // Location selector
+        // Location selector - Fixed
         const locationSelector = document.getElementById('location-selector');
         if (locationSelector) {
             locationSelector.addEventListener('change', (e) => {
                 this.currentLocation = e.target.value;
                 this.updateLocationInfo();
-                this.generateForecastData();
+                this.generateContinuous72HourForecast();
                 this.updateDashboard();
                 this.updateCharts();
             });
@@ -118,20 +129,27 @@ class FishingDashboard {
         speciesButtons.forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
-                
-                // Remove active class from all buttons
                 speciesButtons.forEach(b => b.classList.remove('active'));
-                
-                // Add active class to clicked button
                 e.target.classList.add('active');
-                
-                // Update current species
                 this.currentSpecies = e.target.dataset.species;
-                
-                // Update dashboard with new species data
                 this.updateBiteScore();
                 this.updateForecast();
                 this.updateBestTimes();
+                if (this.selectedWindow) {
+                    this.updateDetailedView();
+                }
+            });
+        });
+
+        // Day tabs for forecast
+        const dayTabs = document.querySelectorAll('.day-tab');
+        dayTabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                e.preventDefault();
+                dayTabs.forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                this.currentDay = parseInt(e.target.dataset.day);
+                this.updateForecast();
             });
         });
 
@@ -147,7 +165,15 @@ class FishingDashboard {
         const exportBtn = document.getElementById('export-csv-btn');
         if (exportBtn) {
             exportBtn.addEventListener('click', () => {
-                this.exportCSV();
+                this.exportEnhancedCSV();
+            });
+        }
+
+        // Close detailed view
+        const closeDetailedView = document.getElementById('close-detailed-view');
+        if (closeDetailedView) {
+            closeDetailedView.addEventListener('click', () => {
+                this.hideDetailedView();
             });
         }
 
@@ -171,7 +197,6 @@ class FishingDashboard {
         }
         
         if (helpModal) {
-            // Close modal on backdrop click
             helpModal.addEventListener('click', (e) => {
                 if (e.target === helpModal) {
                     helpModal.classList.add('hidden');
@@ -207,10 +232,11 @@ class FishingDashboard {
         }
     }
 
-    generateForecastData() {
+    generateContinuous72HourForecast() {
         this.forecastData = [];
         const now = new Date();
         
+        // Generate exactly 72 continuous hours from current time
         for (let i = 0; i < 72; i++) {
             const time = new Date(now.getTime() + i * 60 * 60 * 1000);
             const conditions = this.generateConditionsForTime(time);
@@ -225,14 +251,14 @@ class FishingDashboard {
         const hour = time.getHours();
         const dayOfYear = Math.floor((time - new Date(time.getFullYear(), 0, 0)) / 86400000);
         
-        // Simulate realistic conditions based on time and location
+        // Simulate realistic California coastal conditions
         const baseTemp = 58 + Math.sin((dayOfYear - 80) / 365 * 2 * Math.PI) * 8;
         const tempVariation = Math.sin(hour / 24 * 2 * Math.PI) * 5;
         
         return {
             airTemp: Math.round(baseTemp + tempVariation + (Math.random() - 0.5) * 4),
             waterTemp: Math.round(baseTemp - 3 + (Math.random() - 0.5) * 2),
-            windSpeed: Math.round(8 + Math.sin(hour / 24 * 2 * Math.PI) * 6 + Math.random() * 8),
+            windSpeed: Math.round(6 + Math.sin(hour / 24 * 2 * Math.PI) * 8 + Math.random() * 12),
             windDirection: Math.round(270 + Math.sin(time.getTime() / 86400000) * 60),
             pressure: 29.8 + Math.sin(time.getTime() / 86400000 / 2) * 0.4 + (Math.random() - 0.5) * 0.2,
             waveHeight: Math.round((2 + Math.sin(time.getTime() / 86400000) * 2 + Math.random() * 2) * 10) / 10,
@@ -244,39 +270,85 @@ class FishingDashboard {
     }
 
     calculateTideHeight(time) {
-        // Simplified tide calculation (two high/low cycles per day)
         const hours = time.getHours() + time.getMinutes() / 60;
         const tidePhase = (hours / 12) * Math.PI;
         return Math.round((3 + Math.sin(tidePhase) * 2.5) * 10) / 10;
     }
 
-    calculateBiteScore(conditions, species = this.currentSpecies) {
+    calculateEnhancedBiteScore(conditions, species = this.currentSpecies) {
         const weights = this.speciesWeights[species];
         
-        // Weather score (30% base, adjusted by species)
+        // Calculate base scores
         const weatherScore = this.calculateWeatherScore(conditions);
-        
-        // Tide score (25% base, adjusted by species)
         const tideScore = this.calculateTideScore(conditions, conditions.time);
-        
-        // Solunar score (20% base, adjusted by species)
         const solunarScore = this.calculateSolunarScore(conditions.time);
-        
-        // Water conditions score (15%)
         const waterScore = this.calculateWaterScore(conditions, species);
+        const windScore = this.calculateEnhancedWindScore(conditions, species);
         
-        // Wind safety score (10%)
-        const windScore = this.calculateWindScore(conditions);
-        
-        const totalScore = Math.round(
+        // Apply enhanced wind penalties
+        let totalScore = Math.round(
             weatherScore * weights.weather +
             tideScore * weights.tide +
             solunarScore * weights.solunar +
             waterScore * weights.water +
             windScore * weights.wind
         );
+
+        // Enhanced wind penalty system
+        const windPenalty = this.getWindPenalty(conditions.windSpeed, species);
+        totalScore = Math.round(totalScore * windPenalty.multiplier);
         
-        return Math.max(0, Math.min(100, totalScore));
+        return {
+            score: Math.max(0, Math.min(100, totalScore)),
+            breakdown: {
+                weather: Math.round(weatherScore * weights.weather),
+                tide: Math.round(tideScore * weights.tide),
+                solunar: Math.round(solunarScore * weights.solunar),
+                water: Math.round(waterScore * weights.water),
+                wind: Math.round(windScore * weights.wind),
+                windPenalty: windPenalty
+            }
+        };
+    }
+
+    getWindPenalty(windSpeed, species) {
+        const sensitivity = this.speciesWeights[species].windSensitivity;
+        let multiplier = 1.0;
+        let status = 'good';
+        let description = 'No wind penalty';
+
+        if (windSpeed > this.windThresholds.poor) {
+            // Strong penalty for winds > 10 knots
+            multiplier = this.windThresholds.penaltySevere;
+            if (sensitivity === 'high') multiplier *= 0.8; // Extra penalty for sensitive species
+            status = 'poor';
+            description = `Severe wind penalty (${windSpeed} knots)`;
+        } else if (windSpeed > this.windThresholds.safe) {
+            // Moderate penalty for winds 7-10 knots
+            multiplier = this.windThresholds.penaltyModerate;
+            if (sensitivity === 'high') multiplier *= 0.9;
+            status = 'moderate';
+            description = `Moderate wind penalty (${windSpeed} knots)`;
+        }
+
+        return { multiplier, status, description, windSpeed };
+    }
+
+    calculateEnhancedWindScore(conditions, species) {
+        let score = 50;
+        
+        // Base wind scoring
+        if (conditions.windSpeed >= 5 && conditions.windSpeed <= 7) {
+            score += 50; // Optimal range
+        } else if (conditions.windSpeed <= 5) {
+            score += 30; // Light winds
+        } else if (conditions.windSpeed <= 10) {
+            score += 10; // Getting challenging
+        } else {
+            score -= (conditions.windSpeed - 10) * 10; // Increasingly dangerous
+        }
+        
+        return Math.max(0, Math.min(100, score));
     }
 
     calculateWeatherScore(conditions) {
@@ -314,13 +386,11 @@ class FishingDashboard {
         const hour = time.getHours() + time.getMinutes() / 60;
         const tidePhase = (hour / 12) * 2 * Math.PI;
         
-        // Best fishing 2 hours before/after tide changes
         const tideChangePhase = Math.sin(tidePhase);
         const timeToChange = Math.abs(tideChangePhase);
         
         let score = 30;
         
-        // Peak scoring during tide changes
         if (timeToChange >= 0.7) {
             score += 50; // Near tide change
         } else if (timeToChange >= 0.4) {
@@ -329,7 +399,6 @@ class FishingDashboard {
             score += 10; // Slack tide
         }
         
-        // Moderate tide heights are better
         if (conditions.tideHeight >= 2 && conditions.tideHeight <= 5) {
             score += 20;
         } else {
@@ -342,13 +411,11 @@ class FishingDashboard {
     calculateSolunarScore(time) {
         const hour = time.getHours() + time.getMinutes() / 60;
         
-        // Simulate major and minor periods
         const majorPeriods = [6.5, 18.5]; // Dawn and dusk
         const minorPeriods = [0.5, 12.5]; // Midnight and noon
         
         let score = 20;
         
-        // Check proximity to major periods
         for (let major of majorPeriods) {
             const distance = Math.abs(hour - major);
             if (distance <= 1) {
@@ -358,7 +425,6 @@ class FishingDashboard {
             }
         }
         
-        // Check proximity to minor periods
         for (let minor of minorPeriods) {
             const distance = Math.abs(hour - minor);
             if (distance <= 1) {
@@ -373,7 +439,6 @@ class FishingDashboard {
         const optimalRange = this.speciesWeights[species].optimalWaterTemp;
         let score = 30;
         
-        // Water temperature scoring
         if (conditions.waterTemp >= optimalRange[0] && conditions.waterTemp <= optimalRange[1]) {
             score += 50;
         } else {
@@ -384,7 +449,6 @@ class FishingDashboard {
             score += Math.max(0, 30 - distance * 5);
         }
         
-        // Wave conditions (manageable waves are better)
         if (conditions.waveHeight <= 3) {
             score += 20;
         } else if (conditions.waveHeight <= 5) {
@@ -396,33 +460,15 @@ class FishingDashboard {
         return Math.max(0, Math.min(100, score));
     }
 
-    calculateWindScore(conditions) {
-        let score = 50;
-        
-        // Optimal wind speeds for kayak fishing
-        if (conditions.windSpeed >= 5 && conditions.windSpeed <= 15) {
-            score += 50;
-        } else if (conditions.windSpeed <= 5) {
-            score += 30; // Light winds
-        } else if (conditions.windSpeed <= 20) {
-            score += 20; // Moderate winds
-        } else {
-            score -= (conditions.windSpeed - 20) * 5; // Dangerous winds
-        }
-        
-        return Math.max(0, Math.min(100, score));
-    }
-
     updateDashboard() {
         this.updateCurrentConditions();
         this.updateBiteScore();
         this.updateForecast();
-        this.updateBestTimes();
+        this.updateEnhancedBestTimes();
         this.updateSolunarInfo();
         this.lastUpdate = new Date();
         this.updateLastUpdatedTime();
         
-        // Update charts if they exist
         if (Object.keys(this.charts).length > 0) {
             this.updateCharts();
         }
@@ -434,7 +480,6 @@ class FishingDashboard {
         
         const elements = {
             'current-temp': `${current.airTemp}°F`,
-            'current-wind': `${current.windSpeed} knots`,
             'current-pressure': `${current.pressure.toFixed(2)} inHg`,
             'current-waves': `${current.waveHeight} ft`,
             'current-water-temp': `${current.waterTemp}°F`
@@ -447,6 +492,23 @@ class FishingDashboard {
             }
         });
         
+        // Enhanced wind display with color coding - FIXED
+        const windElement = document.getElementById('current-wind');
+        if (windElement) {
+            windElement.textContent = `${current.windSpeed} knots`;
+            // Remove all wind classes first
+            windElement.className = windElement.className.replace(/wind-\w+/g, '').trim();
+            windElement.classList.add('wind-indicator');
+            
+            if (current.windSpeed <= this.windThresholds.safe) {
+                windElement.classList.add('wind-good');
+            } else if (current.windSpeed <= this.windThresholds.poor) {
+                windElement.classList.add('wind-moderate');
+            } else {
+                windElement.classList.add('wind-poor');
+            }
+        }
+        
         // Tide status
         const tideStatus = current.tideHeight > 4 ? 'High' : current.tideHeight < 2 ? 'Low' : 'Mid';
         const tideElement = document.getElementById('current-tide');
@@ -454,8 +516,48 @@ class FishingDashboard {
             tideElement.textContent = `${tideStatus} (${current.tideHeight}ft)`;
         }
         
-        // Safety assessment
         this.updateSafetyStatus(current);
+        this.updateOverallCondition(current);
+    }
+
+    updateOverallCondition(conditions) {
+        const scoreResult = this.calculateEnhancedBiteScore(conditions);
+        const windPenalty = scoreResult.breakdown.windPenalty;
+        
+        const statusElement = document.getElementById('condition-status');
+        const factorsElement = document.getElementById('condition-factors');
+        
+        if (!statusElement || !factorsElement) return;
+        
+        let conditionClass = 'good';
+        let conditionText = 'Good';
+        
+        // Determine overall condition with wind penalty consideration
+        if (windPenalty.status === 'poor' || scoreResult.score < 40) {
+            conditionClass = 'poor';
+            conditionText = 'Poor';
+        } else if (windPenalty.status === 'moderate' || scoreResult.score < 60) {
+            conditionClass = 'moderate';
+            conditionText = 'Moderate';
+        }
+        
+        statusElement.className = `condition-status ${conditionClass}`;
+        statusElement.textContent = conditionText;
+        
+        // Show factors affecting condition
+        const factors = [];
+        if (windPenalty.status !== 'good') {
+            factors.push(`<span class="wind-penalty">${windPenalty.description}</span>`);
+        }
+        if (conditions.waveHeight > 4) {
+            factors.push('High wave conditions');
+        }
+        if (conditions.precipitation > 0) {
+            factors.push('Precipitation present');
+        }
+        
+        factorsElement.innerHTML = factors.length > 0 ? 
+            factors.join(', ') : 'All factors favorable';
     }
 
     updateSafetyStatus(conditions) {
@@ -470,7 +572,7 @@ class FishingDashboard {
         if (conditions.windSpeed > 25 || conditions.waveHeight > 6) {
             status = 'danger';
             message = 'Dangerous Conditions';
-        } else if (conditions.windSpeed > 20 || conditions.waveHeight > 4) {
+        } else if (conditions.windSpeed > 15 || conditions.waveHeight > 4) {
             status = 'caution';
             message = 'Use Caution';
         }
@@ -483,7 +585,8 @@ class FishingDashboard {
         const current = this.forecastData[0];
         if (!current) return;
         
-        const score = this.calculateBiteScore(current);
+        const scoreResult = this.calculateEnhancedBiteScore(current);
+        const score = scoreResult.score;
         const scoreElement = document.getElementById('bite-score');
         const circleElement = scoreElement?.closest('.score-circle');
         const labelElement = document.getElementById('score-label');
@@ -493,7 +596,6 @@ class FishingDashboard {
             scoreElement.textContent = score;
         }
         
-        // Update score circle color
         if (circleElement) {
             circleElement.className = 'score-circle';
             if (score >= 75) {
@@ -510,8 +612,8 @@ class FishingDashboard {
         
         // Calculate trend
         if (this.forecastData.length > 1 && trendElement) {
-            const nextScore = this.calculateBiteScore(this.forecastData[1]);
-            const trend = nextScore - score;
+            const nextResult = this.calculateEnhancedBiteScore(this.forecastData[1]);
+            const trend = nextResult.score - score;
             
             trendElement.className = 'score-trend';
             if (trend > 2) {
@@ -532,16 +634,21 @@ class FishingDashboard {
         
         container.innerHTML = '';
         
-        this.forecastData.slice(0, 24).forEach((data, index) => {
-            const score = this.calculateBiteScore(data);
-            const row = this.createForecastRow(data, score, index);
+        const startIndex = this.currentDay * 24;
+        const endIndex = Math.min(startIndex + 24, this.forecastData.length);
+        const dayData = this.forecastData.slice(startIndex, endIndex);
+        
+        dayData.forEach((data, index) => {
+            const scoreResult = this.calculateEnhancedBiteScore(data);
+            const row = this.createForecastRow(data, scoreResult, startIndex + index);
             container.appendChild(row);
         });
     }
 
-    createForecastRow(data, score, index) {
+    createForecastRow(data, scoreResult, index) {
         const row = document.createElement('div');
         row.className = 'forecast-row';
+        row.dataset.index = index;
         
         const timeStr = data.time.toLocaleTimeString('en-US', {
             hour: '2-digit',
@@ -549,10 +656,10 @@ class FishingDashboard {
             hour12: false
         });
         
+        const score = scoreResult.score;
         const scoreClass = score >= 75 ? 'excellent' : score >= 50 ? 'good' : 'poor';
         const tideSymbol = data.tideHeight > 4 ? 'H' : data.tideHeight < 2 ? 'L' : 'M';
         
-        // Highlight best windows
         if (score >= 70) {
             row.classList.add('highlight');
         }
@@ -562,11 +669,22 @@ class FishingDashboard {
             <span class="forecast-score ${scoreClass}">${score}</span>
             <span>${data.airTemp}°F ${this.getWeatherIcon(data)}</span>
             <span>${tideSymbol}${data.tideHeight}</span>
-            <span>${data.windSpeed}kt</span>
+            <span class="wind-indicator wind-${this.getWindClass(data.windSpeed)}">${data.windSpeed}kt</span>
             <span>${data.waveHeight}ft</span>
         `;
         
+        // Make row clickable to show details
+        row.addEventListener('click', () => {
+            this.selectTimeWindow(data, scoreResult);
+        });
+        
         return row;
+    }
+
+    getWindClass(windSpeed) {
+        if (windSpeed <= this.windThresholds.safe) return 'good';
+        if (windSpeed <= this.windThresholds.poor) return 'moderate';
+        return 'poor';
     }
 
     getWeatherIcon(conditions) {
@@ -576,68 +694,71 @@ class FishingDashboard {
         return '☀️';
     }
 
-    updateBestTimes() {
+    updateEnhancedBestTimes() {
         const today = this.forecastData.slice(0, 24);
         const tomorrow = this.forecastData.slice(24, 48);
         
-        const todayBest = this.findBestWindows(today);
-        const tomorrowBest = this.findBestWindows(tomorrow);
+        const todayBest = this.findEnhancedBestWindows(today, 'today');
+        const tomorrowBest = this.findEnhancedBestWindows(tomorrow, 'tomorrow');
         
-        this.renderBestTimes('best-times-list', todayBest);
-        this.renderBestTimes('tomorrow-times-list', tomorrowBest);
+        this.renderEnhancedBestTimes('best-times-list', todayBest);
+        this.renderEnhancedBestTimes('tomorrow-times-list', tomorrowBest);
     }
 
-    findBestWindows(data) {
+    findEnhancedBestWindows(data, dayLabel) {
         const windows = [];
         
         for (let i = 0; i < data.length - 1; i++) {
-            const score = this.calculateBiteScore(data[i]);
-            if (score >= 60) {
+            const scoreResult = this.calculateEnhancedBiteScore(data[i]);
+            if (scoreResult.score >= 60) {
                 // Find continuous good periods
                 let endIndex = i;
-                while (endIndex < data.length - 1 && this.calculateBiteScore(data[endIndex + 1]) >= 50) {
-                    endIndex++;
+                while (endIndex < data.length - 1) {
+                    const nextScore = this.calculateEnhancedBiteScore(data[endIndex + 1]);
+                    if (nextScore.score >= 50) {
+                        endIndex++;
+                    } else {
+                        break;
+                    }
                 }
+                
+                const windowScores = data.slice(i, endIndex + 1).map(d => this.calculateEnhancedBiteScore(d));
+                const maxScore = Math.max(...windowScores.map(s => s.score));
                 
                 windows.push({
                     start: data[i].time,
                     end: data[endIndex].time,
-                    score: Math.max(...data.slice(i, endIndex + 1).map(d => this.calculateBiteScore(d))),
-                    reason: this.getBestTimeReason(data[i])
+                    score: maxScore,
+                    scoreResult: windowScores[windowScores.findIndex(s => s.score === maxScore)],
+                    reason: this.getBestTimeReason(data[i], windowScores[0]),
+                    data: data.slice(i, endIndex + 1),
+                    dayLabel: dayLabel
                 });
                 
-                i = endIndex; // Skip processed period
+                i = endIndex;
             }
         }
         
-        return windows.sort((a, b) => b.score - a.score).slice(0, 3);
+        return windows.sort((a, b) => {
+            // Sort by time (chronological order)
+            return a.start.getTime() - b.start.getTime();
+        }).slice(0, 4); // Show top 4 windows per day
     }
 
-    getBestTimeReason(data) {
+    getBestTimeReason(data, scoreResult) {
         const reasons = [];
+        const breakdown = scoreResult.breakdown;
         
-        if (data.pressure >= 29.8 && data.pressure <= 30.2) {
-            reasons.push('stable pressure');
-        }
-        
-        const hour = data.time.getHours();
-        if ((hour >= 5 && hour <= 8) || (hour >= 17 && hour <= 20)) {
-            reasons.push('prime solunar time');
-        }
-        
-        const tidePhase = Math.sin((hour / 12) * 2 * Math.PI);
-        if (Math.abs(tidePhase) >= 0.7) {
-            reasons.push('active tide');
-        }
-        
-        if (data.windSpeed >= 5 && data.windSpeed <= 15) {
-            reasons.push('optimal wind');
-        }
+        if (breakdown.weather > 20) reasons.push('stable pressure');
+        if (breakdown.solunar > 15) reasons.push('prime solunar time');
+        if (breakdown.tide > 20) reasons.push('active tide');
+        if (breakdown.windPenalty.status === 'good') reasons.push('optimal wind');
+        if (breakdown.water > 12) reasons.push('good water conditions');
         
         return reasons.length > 0 ? reasons.join(' + ') : 'favorable conditions';
     }
 
-    renderBestTimes(containerId, windows) {
+    renderEnhancedBestTimes(containerId, windows) {
         const container = document.getElementById(containerId);
         if (!container) return;
         
@@ -645,7 +766,7 @@ class FishingDashboard {
         
         windows.forEach(window => {
             const item = document.createElement('div');
-            item.className = 'best-time-item';
+            item.className = 'best-time-item clickable';
             
             const startTime = window.start.toLocaleTimeString('en-US', {
                 hour: '2-digit',
@@ -669,7 +790,173 @@ class FishingDashboard {
                 <div class="best-time-reason">${window.reason}</div>
             `;
             
+            // Make clickable to show detailed view - FIXED
+            item.addEventListener('click', () => {
+                this.selectTimeWindow(window.data[0], window.scoreResult, window);
+                this.highlightSelectedWindow(item);
+            });
+            
             container.appendChild(item);
+        });
+    }
+
+    selectTimeWindow(data, scoreResult, window = null) {
+        this.selectedWindow = { data, scoreResult, window };
+        this.showDetailedView();
+    }
+
+    showDetailedView() {
+        const panel = document.getElementById('detailed-view-panel');
+        if (!panel || !this.selectedWindow) return;
+        
+        panel.classList.remove('hidden');
+        panel.classList.add('fade-in');
+        this.updateDetailedView();
+    }
+
+    hideDetailedView() {
+        const panel = document.getElementById('detailed-view-panel');
+        if (!panel) return;
+        
+        panel.classList.add('hidden');
+        this.selectedWindow = null;
+        this.clearSelectedHighlights();
+    }
+
+    updateDetailedView() {
+        if (!this.selectedWindow) return;
+        
+        const { data, scoreResult, window } = this.selectedWindow;
+        
+        // Update time range
+        const timeRangeElement = document.getElementById('selected-time-range');
+        if (timeRangeElement) {
+            if (window) {
+                const startTime = window.start.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
+                const endTime = window.end.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
+                timeRangeElement.textContent = `${startTime} - ${endTime}`;
+            } else {
+                const timeStr = data.time.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
+                timeRangeElement.textContent = timeStr;
+            }
+        }
+        
+        // Update score
+        const scoreElement = document.getElementById('selected-score');
+        if (scoreElement) {
+            const score = scoreResult.score;
+            const scoreClass = score >= 75 ? 'excellent' : score >= 50 ? 'good' : 'poor';
+            scoreElement.className = `selected-score ${scoreClass}`;
+            scoreElement.textContent = `Score: ${score}`;
+        }
+        
+        // Update scoring breakdown
+        this.updateScoringBreakdown(scoreResult.breakdown);
+        
+        // Update recommendations
+        this.updateRecommendations(data, scoreResult);
+    }
+
+    updateScoringBreakdown(breakdown) {
+        const container = document.getElementById('scoring-breakdown');
+        if (!container) return;
+        
+        container.innerHTML = `
+            <h4>Scoring Breakdown:</h4>
+            <div class="breakdown-item">
+                <span>Weather Conditions:</span>
+                <span>${breakdown.weather} pts</span>
+            </div>
+            <div class="breakdown-item">
+                <span>Tide Activity:</span>
+                <span>${breakdown.tide} pts</span>
+            </div>
+            <div class="breakdown-item">
+                <span>Solunar Influence:</span>
+                <span>${breakdown.solunar} pts</span>
+            </div>
+            <div class="breakdown-item">
+                <span>Water Conditions:</span>
+                <span>${breakdown.water} pts</span>
+            </div>
+            <div class="breakdown-item">
+                <span>Wind Safety:</span>
+                <span>${breakdown.wind} pts</span>
+            </div>
+            ${breakdown.windPenalty.status !== 'good' ? `
+                <div class="breakdown-item wind-penalty">
+                    <span>Wind Penalty:</span>
+                    <span>${breakdown.windPenalty.description}</span>
+                </div>
+            ` : ''}
+        `;
+    }
+
+    updateRecommendations(data, scoreResult) {
+        const container = document.getElementById('recommendations');
+        if (!container) return;
+        
+        const recommendations = [];
+        const breakdown = scoreResult.breakdown;
+        
+        if (breakdown.windPenalty.status === 'poor') {
+            recommendations.push('Consider postponing trip due to high winds');
+            recommendations.push('If fishing, stay close to protected areas');
+        } else if (breakdown.windPenalty.status === 'moderate') {
+            recommendations.push('Use caution with wind conditions');
+            recommendations.push('Consider lighter tackle and closer-to-shore fishing');
+        }
+        
+        if (breakdown.tide > 20) {
+            recommendations.push('Excellent tide conditions - focus on structure and drop-offs');
+        }
+        
+        if (breakdown.solunar > 15) {
+            recommendations.push('Prime solunar activity - fish should be actively feeding');
+        }
+        
+        if (data.waveHeight <= 2) {
+            recommendations.push('Calm sea conditions ideal for kayak fishing');
+        } else if (data.waveHeight > 4) {
+            recommendations.push('Rough seas - experienced kayakers only');
+        }
+        
+        if (recommendations.length === 0) {
+            recommendations.push('Standard fishing conditions apply');
+            recommendations.push('Use normal tackle and techniques for target species');
+        }
+        
+        container.innerHTML = `
+            <h4>Recommendations:</h4>
+            <ul>
+                ${recommendations.map(rec => `<li>${rec}</li>`).join('')}
+            </ul>
+        `;
+    }
+
+    highlightSelectedWindow(element) {
+        // Clear previous selections
+        this.clearSelectedHighlights();
+        
+        // Add selection to clicked element
+        element.classList.add('selected');
+    }
+
+    clearSelectedHighlights() {
+        document.querySelectorAll('.best-time-item.selected, .time-period.selected').forEach(el => {
+            el.classList.remove('selected');
         });
     }
 
@@ -690,22 +977,8 @@ class FishingDashboard {
         if (phaseIcon) phaseIcon.textContent = moonPhases[moonPhaseIndex];
         if (phaseText) phaseText.textContent = phaseNames[moonPhaseIndex];
         
-        // Major and minor periods
-        const majorPeriods = ['6:30 AM - 8:30 AM', '6:30 PM - 8:30 PM'];
-        const minorPeriods = ['12:30 AM - 1:30 AM', '12:30 PM - 1:30 PM'];
-        
-        const majorElement = document.getElementById('major-periods');
-        const minorElement = document.getElementById('minor-periods');
-        
-        if (majorElement) {
-            majorElement.innerHTML = 
-                majorPeriods.map(period => `<div class="time-period">${period}</div>`).join('');
-        }
-        
-        if (minorElement) {
-            minorElement.innerHTML = 
-                minorPeriods.map(period => `<div class="time-period">${period}</div>`).join('');
-        }
+        // Enhanced solunar periods with clickable functionality - FIXED
+        this.renderClickableSolunarPeriods();
         
         // Sun times
         const sunriseElement = document.getElementById('sunrise-time');
@@ -715,14 +988,108 @@ class FishingDashboard {
         if (sunsetElement) sunsetElement.textContent = '7:20 PM';
     }
 
-    initializeCharts() {
-        // Check if Chart.js is available
+    renderClickableSolunarPeriods() {
+        const majorPeriods = [
+            { start: '6:30 AM', end: '8:30 AM', type: 'major' },
+            { start: '6:30 PM', end: '8:30 PM', type: 'major' }
+        ];
+        const minorPeriods = [
+            { start: '12:30 AM', end: '1:30 AM', type: 'minor' },
+            { start: '12:30 PM', end: '1:30 PM', type: 'minor' }
+        ];
+        
+        const majorElement = document.getElementById('major-periods');
+        const minorElement = document.getElementById('minor-periods');
+        
+        if (majorElement) {
+            majorElement.innerHTML = majorPeriods.map(period => 
+                `<div class="time-period clickable" data-period="${period.start}-${period.end}" data-type="${period.type}">${period.start} - ${period.end}</div>`
+            ).join('');
+            
+            // Add click handlers - FIXED
+            majorElement.querySelectorAll('.time-period').forEach(el => {
+                el.addEventListener('click', () => {
+                    this.selectSolunarPeriod(el, el.dataset.period, el.dataset.type);
+                });
+            });
+        }
+        
+        if (minorElement) {
+            minorElement.innerHTML = minorPeriods.map(period => 
+                `<div class="time-period clickable" data-period="${period.start}-${period.end}" data-type="${period.type}">${period.start} - ${period.end}</div>`
+            ).join('');
+            
+            // Add click handlers - FIXED
+            minorElement.querySelectorAll('.time-period').forEach(el => {
+                el.addEventListener('click', () => {
+                    this.selectSolunarPeriod(el, el.dataset.period, el.dataset.type);
+                });
+            });
+        }
+    }
+
+    selectSolunarPeriod(element, period, type) {
+        // Create enhanced mock data for solunar period
+        const now = new Date();
+        const mockData = this.generateConditionsForTime(now);
+        
+        // Enhance solunar score for the selected period
+        let enhancedMockData = { ...mockData };
+        if (type === 'major') {
+            enhancedMockData.solunarBonus = 40; // Major period bonus
+        } else {
+            enhancedMockData.solunarBonus = 20; // Minor period bonus
+        }
+        
+        const scoreResult = this.calculateEnhancedBiteScore(enhancedMockData);
+        
+        // Boost solunar component for display
+        scoreResult.breakdown.solunar += (enhancedMockData.solunarBonus || 0);
+        scoreResult.score = Math.min(100, scoreResult.score + (enhancedMockData.solunarBonus || 0) * 0.3);
+        
+        this.selectTimeWindow(enhancedMockData, scoreResult);
+        this.highlightSelectedWindow(element);
+    }
+
+    initializeEnhancedCharts() {
         if (typeof Chart === 'undefined') {
             console.error('Chart.js not loaded');
             return;
         }
 
-        // Tide Chart
+        // Common chart configuration with enhanced axis labels
+        const chartConfig = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    grid: { display: true, color: 'rgba(255,255,255,0.1)' },
+                    ticks: { 
+                        color: '#9ca3af', 
+                        font: { size: 11 },
+                        maxTicksLimit: 8
+                    },
+                    title: {
+                        display: true,
+                        text: 'Time',
+                        color: '#9ca3af',
+                        font: { size: 12, weight: 'bold' }
+                    }
+                },
+                y: {
+                    grid: { display: true, color: 'rgba(255,255,255,0.1)' },
+                    ticks: { 
+                        color: '#9ca3af', 
+                        font: { size: 11 }
+                    }
+                }
+            }
+        };
+
+        // Tide Chart with enhanced labels - FIXED
         const tideCanvas = document.getElementById('tide-chart');
         if (tideCanvas) {
             this.charts.tide = new Chart(tideCanvas, {
@@ -739,24 +1106,26 @@ class FishingDashboard {
                     }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
+                    ...chartConfig,
                     scales: {
+                        ...chartConfig.scales,
                         y: {
+                            ...chartConfig.scales.y,
                             beginAtZero: true,
-                            max: 8
+                            max: 8,
+                            title: {
+                                display: true,
+                                text: 'Tide Height (ft)',
+                                color: '#9ca3af',
+                                font: { size: 12, weight: 'bold' }
+                            }
                         }
                     }
                 }
             });
         }
 
-        // Pressure Chart
+        // Pressure Chart - FIXED
         const pressureCanvas = document.getElementById('pressure-chart');
         if (pressureCanvas) {
             this.charts.pressure = new Chart(pressureCanvas, {
@@ -764,7 +1133,7 @@ class FishingDashboard {
                 data: {
                     labels: [],
                     datasets: [{
-                        label: 'Pressure (inHg)',
+                        label: 'Barometric Pressure (inHg)',
                         data: [],
                         borderColor: '#FFC185',
                         backgroundColor: 'rgba(255, 193, 133, 0.1)',
@@ -773,24 +1142,26 @@ class FishingDashboard {
                     }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
+                    ...chartConfig,
                     scales: {
+                        ...chartConfig.scales,
                         y: {
+                            ...chartConfig.scales.y,
                             min: 29.0,
-                            max: 31.0
+                            max: 31.0,
+                            title: {
+                                display: true,
+                                text: 'Barometric Pressure (inHg)',
+                                color: '#9ca3af',
+                                font: { size: 12, weight: 'bold' }
+                            }
                         }
                     }
                 }
             });
         }
 
-        // Temperature Chart
+        // Temperature Chart - FIXED
         const tempCanvas = document.getElementById('temperature-chart');
         if (tempCanvas) {
             this.charts.temperature = new Chart(tempCanvas, {
@@ -798,7 +1169,7 @@ class FishingDashboard {
                 data: {
                     labels: [],
                     datasets: [{
-                        label: 'Water Temp (°F)',
+                        label: 'Water Temperature (°F)',
                         data: [],
                         borderColor: '#B4413C',
                         backgroundColor: 'rgba(180, 65, 60, 0.1)',
@@ -807,18 +1178,24 @@ class FishingDashboard {
                     }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
+                    ...chartConfig,
+                    scales: {
+                        ...chartConfig.scales,
+                        y: {
+                            ...chartConfig.scales.y,
+                            title: {
+                                display: true,
+                                text: 'Water Temperature (°F)',
+                                color: '#9ca3af',
+                                font: { size: 12, weight: 'bold' }
+                            }
                         }
                     }
                 }
             });
         }
 
-        // Wind Chart
+        // Wind Chart with color coding - FIXED
         const windCanvas = document.getElementById('wind-chart');
         if (windCanvas) {
             this.charts.wind = new Chart(windCanvas, {
@@ -828,29 +1205,35 @@ class FishingDashboard {
                     datasets: [{
                         label: 'Wind Speed (knots)',
                         data: [],
-                        backgroundColor: '#5D878F',
+                        backgroundColor: (ctx) => {
+                            const value = ctx.parsed?.y || 0;
+                            if (value <= 7) return '#10b981'; // Good - green
+                            if (value <= 10) return '#f59e0b'; // Moderate - yellow
+                            return '#ef4444'; // Poor - red
+                        },
                         borderRadius: 4
                     }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
+                    ...chartConfig,
                     scales: {
+                        ...chartConfig.scales,
                         y: {
+                            ...chartConfig.scales.y,
                             beginAtZero: true,
-                            max: 35
+                            max: 35,
+                            title: {
+                                display: true,
+                                text: 'Wind Speed (knots)',
+                                color: '#9ca3af',
+                                font: { size: 12, weight: 'bold' }
+                            }
                         }
                     }
                 }
             });
         }
 
-        // Update charts with initial data
         this.updateCharts();
     }
 
@@ -863,28 +1246,24 @@ class FishingDashboard {
             minute: '2-digit'
         }));
 
-        // Update tide chart
         if (this.charts.tide) {
             this.charts.tide.data.labels = labels;
             this.charts.tide.data.datasets[0].data = data24h.map(d => d.tideHeight);
             this.charts.tide.update('none');
         }
 
-        // Update pressure chart
         if (this.charts.pressure) {
             this.charts.pressure.data.labels = labels;
             this.charts.pressure.data.datasets[0].data = data24h.map(d => d.pressure);
             this.charts.pressure.update('none');
         }
 
-        // Update temperature chart
         if (this.charts.temperature) {
             this.charts.temperature.data.labels = labels;
             this.charts.temperature.data.datasets[0].data = data24h.map(d => d.waterTemp);
             this.charts.temperature.update('none');
         }
 
-        // Update wind chart
         if (this.charts.wind) {
             this.charts.wind.data.labels = labels;
             this.charts.wind.data.datasets[0].data = data24h.map(d => d.windSpeed);
@@ -899,9 +1278,8 @@ class FishingDashboard {
         button.classList.add('loading');
         button.textContent = 'Updating...';
         
-        // Simulate API call delay
         setTimeout(() => {
-            this.generateForecastData();
+            this.generateContinuous72HourForecast();
             this.updateDashboard();
             
             button.classList.remove('loading');
@@ -922,21 +1300,34 @@ class FishingDashboard {
         }
     }
 
-    exportCSV() {
-        const headers = ['Time', 'Bite Score', 'Air Temp', 'Water Temp', 'Wind Speed', 'Wave Height', 'Tide Height', 'Pressure'];
+    exportEnhancedCSV() {
+        const headers = [
+            'Time', 'Bite Score', 'Air Temp', 'Water Temp', 'Wind Speed', 'Wind Status',
+            'Wave Height', 'Tide Height', 'Pressure', 'Weather Score', 'Tide Score',
+            'Solunar Score', 'Water Score', 'Wind Score', 'Wind Penalty'
+        ];
         const rows = [headers];
         
-        this.forecastData.slice(0, 24).forEach(data => {
-            const score = this.calculateBiteScore(data);
+        this.forecastData.slice(0, 72).forEach(data => {
+            const scoreResult = this.calculateEnhancedBiteScore(data);
+            const breakdown = scoreResult.breakdown;
+            
             rows.push([
                 data.time.toLocaleString(),
-                score,
+                scoreResult.score,
                 data.airTemp,
                 data.waterTemp,
                 data.windSpeed,
+                breakdown.windPenalty.status,
                 data.waveHeight,
                 data.tideHeight,
-                data.pressure.toFixed(2)
+                data.pressure.toFixed(2),
+                breakdown.weather,
+                breakdown.tide,
+                breakdown.solunar,
+                breakdown.water,
+                breakdown.wind,
+                breakdown.windPenalty.description
             ]);
         });
         
@@ -946,7 +1337,7 @@ class FishingDashboard {
         
         const a = document.createElement('a');
         a.href = url;
-        a.download = `kayak-fishing-forecast-${new Date().toISOString().split('T')[0]}.csv`;
+        a.download = `enhanced-kayak-fishing-forecast-${new Date().toISOString().split('T')[0]}.csv`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -954,6 +1345,6 @@ class FishingDashboard {
     }
 }
 
-// Initialize dashboard when DOM is loaded
+// Initialize enhanced dashboard
 const dashboard = new FishingDashboard();
 dashboard.init();

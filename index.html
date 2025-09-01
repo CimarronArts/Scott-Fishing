@@ -40,7 +40,7 @@
                     </div>
                     <div class="condition-item">
                         <label>Wind</label>
-                        <span id="current-wind">-- knots</span>
+                        <span id="current-wind" class="wind-indicator">-- knots</span>
                     </div>
                     <div class="condition-item">
                         <label>Barometric Pressure</label>
@@ -63,6 +63,15 @@
                     <div id="safety-indicator" class="safety-indicator good">
                         <span class="safety-dot"></span>
                         <span id="safety-text">Conditions Good</span>
+                    </div>
+                </div>
+                <div id="overall-condition" class="overall-condition">
+                    <div class="condition-header">
+                        <span>Overall Condition:</span>
+                        <span id="condition-status" class="condition-status good">Good</span>
+                    </div>
+                    <div id="condition-factors" class="condition-factors">
+                        <!-- Wind penalty and other factors will be shown here -->
                     </div>
                 </div>
             </section>
@@ -111,11 +120,11 @@
                 <div class="solunar-times">
                     <h4>Major Periods</h4>
                     <div id="major-periods" class="time-periods">
-                        <!-- Generated dynamically -->
+                        <!-- Generated dynamically with clickable periods -->
                     </div>
                     <h4>Minor Periods</h4>
                     <div id="minor-periods" class="time-periods">
-                        <!-- Generated dynamically -->
+                        <!-- Generated dynamically with clickable periods -->
                     </div>
                 </div>
                 <div class="sun-times">
@@ -130,9 +139,32 @@
                 </div>
             </section>
 
+            <!-- Detailed Window View -->
+            <section id="detailed-view-panel" class="detailed-view-panel hidden">
+                <h2>Selected Time Window Details</h2>
+                <div id="selected-window-info" class="selected-window-info">
+                    <div class="window-header">
+                        <span id="selected-time-range" class="selected-time-range">--</span>
+                        <span id="selected-score" class="selected-score">--</span>
+                    </div>
+                    <div id="scoring-breakdown" class="scoring-breakdown">
+                        <!-- Detailed scoring factors -->
+                    </div>
+                    <div id="recommendations" class="recommendations">
+                        <!-- Specific recommendations for this window -->
+                    </div>
+                </div>
+                <button id="close-detailed-view" class="btn btn--outline btn--sm">Close Details</button>
+            </section>
+
             <!-- 72-Hour Forecast Grid -->
             <section class="forecast-grid">
-                <h2>72-Hour Forecast</h2>
+                <h2>72-Hour Continuous Forecast</h2>
+                <div class="forecast-day-tabs">
+                    <button class="day-tab active" data-day="0">Today</button>
+                    <button class="day-tab" data-day="1">Tomorrow</button>
+                    <button class="day-tab" data-day="2">Day After</button>
+                </div>
                 <div class="forecast-container">
                     <div class="forecast-header">
                         <span>Time</span>
@@ -152,17 +184,29 @@
             <section class="charts-section">
                 <h2>Trend Analysis</h2>
                 <div class="charts-grid">
-                    <div class="chart-container" style="position: relative; height: 200px;">
-                        <canvas id="tide-chart"></canvas>
+                    <div class="chart-wrapper">
+                        <h3 class="chart-title">Tide Height Forecast</h3>
+                        <div class="chart-container" style="position: relative; height: 200px;">
+                            <canvas id="tide-chart"></canvas>
+                        </div>
                     </div>
-                    <div class="chart-container" style="position: relative; height: 200px;">
-                        <canvas id="pressure-chart"></canvas>
+                    <div class="chart-wrapper">
+                        <h3 class="chart-title">Barometric Pressure Trend</h3>
+                        <div class="chart-container" style="position: relative; height: 200px;">
+                            <canvas id="pressure-chart"></canvas>
+                        </div>
                     </div>
-                    <div class="chart-container" style="position: relative; height: 200px;">
-                        <canvas id="temperature-chart"></canvas>
+                    <div class="chart-wrapper">
+                        <h3 class="chart-title">Water Temperature Forecast</h3>
+                        <div class="chart-container" style="position: relative; height: 200px;">
+                            <canvas id="temperature-chart"></canvas>
+                        </div>
                     </div>
-                    <div class="chart-container" style="position: relative; height: 200px;">
-                        <canvas id="wind-chart"></canvas>
+                    <div class="chart-wrapper">
+                        <h3 class="chart-title">Wind Speed & Direction Forecast</h3>
+                        <div class="chart-container" style="position: relative; height: 200px;">
+                            <canvas id="wind-chart"></canvas>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -184,18 +228,24 @@
         <div id="help-modal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>Prediction Methodology</h3>
+                    <h3>Enhanced Prediction Methodology</h3>
                     <button id="close-modal" class="close-btn">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <h4>Bite Prediction Algorithm</h4>
-                    <p>Our intelligent scoring system combines multiple marine factors:</p>
+                    <h4>Enhanced Bite Prediction Algorithm</h4>
+                    <p>Our intelligent scoring system combines multiple marine factors with improved wind penalty logic:</p>
                     <ul>
                         <li><strong>Weather Conditions (30%):</strong> Barometric pressure trends, temperature stability, precipitation</li>
                         <li><strong>Tide States (25%):</strong> Timing relative to tide changes, current strength, tide height ranges</li>
                         <li><strong>Solunar Activity (20%):</strong> Major/minor feeding periods, moon phase influence</li>
                         <li><strong>Water Conditions (15%):</strong> Sea surface temperature, wave height and period</li>
-                        <li><strong>Wind Safety (10%):</strong> Wind speed/direction for kayak safety</li>
+                        <li><strong>Wind Safety (10%):</strong> Enhanced wind penalty system for kayak safety</li>
+                    </ul>
+                    <h4>Enhanced Wind Penalty System</h4>
+                    <ul>
+                        <li><span class="wind-good">≤ 7 knots:</span> Optimal conditions (no penalty)</li>
+                        <li><span class="wind-moderate">7-10 knots:</span> Moderate penalty applied</li>
+                        <li><span class="wind-poor">> 10 knots:</span> Strong penalty, marked as "Poor" conditions</li>
                     </ul>
                     <h4>Score Interpretation</h4>
                     <ul>
@@ -203,6 +253,7 @@
                         <li><span class="score-good">50-74:</span> Good fishing potential</li>
                         <li><span class="score-poor">0-49:</span> Poor conditions</li>
                     </ul>
+                    <p><strong>New Features:</strong> Click any time window to see detailed scoring breakdown and specific recommendations for that period.</p>
                 </div>
             </div>
         </div>
